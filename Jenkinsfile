@@ -3,9 +3,9 @@ pipeline {
 
     environment {
         APP_NAME = "seclock"
-        AWS_REGION = "ap-northeast-1"
+        AWS_REGION = "ap-south-1"
         ECR_REPOSITORY = "seclock"
-        AWS_ACCOUNT_ID = "699588736418"
+        AWS_ACCOUNT_ID = "994878981749"
         ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_NAME = "${ECR_REGISTRY}/${ECR_REPOSITORY}"
         SONAR_PROJECT_KEY = "seclock"
@@ -19,29 +19,19 @@ pipeline {
             }
         }
 
-        stage('Install Dependencies') {
-            steps {
-                sh '''
-                    python3 -m venv venv
-                    . venv/bin/activate
-                    pip install --upgrade pip
-                    pip install -r requirements.txt
-                    pip install pytest httpx2
-                '''
-            }
-        }
 
-     stage('Install Dependencies') {
+stage('Install Dependencies') {
     steps {
         sh '''
             set -e
 
-            echo "===== CLEAN OLD VENV ====="
+            echo "===== REMOVE OLD VIRTUAL ENVIRONMENT ====="
             rm -rf venv
 
-            echo "===== CREATE VENV ====="
+            echo "===== CREATE VIRTUAL ENVIRONMENT ====="
             python3 -m venv venv
 
+            echo "===== ACTIVATE VIRTUAL ENVIRONMENT ====="
             . venv/bin/activate
 
             echo "===== PYTHON VERSION ====="
@@ -57,35 +47,32 @@ pipeline {
             echo "===== INSTALL TEST DEPENDENCIES ====="
             python -m pip install --upgrade pytest httpx2
 
-            echo "===== VERIFY HTTPX2 ====="
-            python -m pip show httpx2
-
             echo "===== VERIFY FASTAPI ====="
             python -m pip show fastapi
 
             echo "===== VERIFY STARLETTE ====="
             python -m pip show starlette
 
-            echo "===== TEST TESTCLIENT IMPORT ====="
-            python -c "from fastapi.testclient import TestClient; print('TestClient import successful')"
+            echo "===== VERIFY HTTPX2 ====="
+            python -m pip show httpx2
+
+            echo "===== VERIFY TESTCLIENT ====="
+            python -c "from fastapi.testclient import TestClient; print('TestClient import SUCCESS')"
         '''
     }
 }
-
-stage('Test') {
+       stage('Test') {
     steps {
         sh '''
             set -e
 
             . venv/bin/activate
 
-            echo "===== PYTHON ====="
+            echo "===== PYTHON VERSION ====="
             python --version
-            which python
 
-            echo "===== PYTEST ====="
-            which pytest
-            pytest --version
+            echo "===== PYTHON LOCATION ====="
+            which python
 
             echo "===== SYNTAX CHECK ====="
 
@@ -99,19 +86,18 @@ stage('Test') {
 
             echo "===== TESTCLIENT CHECK ====="
 
-            python -c "from fastapi.testclient import TestClient; print('TestClient OK')"
+            python -c "from fastapi.testclient import TestClient; print('TestClient import SUCCESS')"
 
-            echo "===== RUN TESTS ====="
+            echo "===== RUNNING PYTEST ====="
 
             if [ -f test_e2e.py ]; then
-                pytest -v test_e2e.py
+                python -m pytest -v test_e2e.py
             else
                 echo "No test_e2e.py found. Skipping tests."
             fi
         '''
     }
 }
-
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('sonarqube') {
@@ -121,7 +107,7 @@ stage('Test') {
                             -Dsonar.projectName=${APP_NAME} \
                             -Dsonar.sources=. \
                             -Dsonar.python.version=3.12 \
-                            -Dsonar.exclusions="venv/**,__pycache__/**,sample_certificates/**"
+                            -Dsonar.exclusions="venv/*,_pycache_/,sample_certificates/*"
                     '''
                 }
             }
