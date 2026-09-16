@@ -31,12 +31,63 @@ pipeline {
             }
         }
 
-        stage('Test') {
+     stage('Install Dependencies') {
     steps {
         sh '''
+            set -e
+
+            echo "===== CLEAN OLD VENV ====="
+            rm -rf venv
+
+            echo "===== CREATE VENV ====="
+            python3 -m venv venv
+
             . venv/bin/activate
 
-            echo "Running Python syntax checks..."
+            echo "===== PYTHON VERSION ====="
+            python --version
+            which python
+
+            echo "===== UPGRADE PIP ====="
+            python -m pip install --upgrade pip
+
+            echo "===== INSTALL REQUIREMENTS ====="
+            python -m pip install -r requirements.txt
+
+            echo "===== INSTALL TEST DEPENDENCIES ====="
+            python -m pip install --upgrade pytest httpx2
+
+            echo "===== VERIFY HTTPX2 ====="
+            python -m pip show httpx2
+
+            echo "===== VERIFY FASTAPI ====="
+            python -m pip show fastapi
+
+            echo "===== VERIFY STARLETTE ====="
+            python -m pip show starlette
+
+            echo "===== TEST TESTCLIENT IMPORT ====="
+            python -c "from fastapi.testclient import TestClient; print('TestClient import successful')"
+        '''
+    }
+}
+
+stage('Test') {
+    steps {
+        sh '''
+            set -e
+
+            . venv/bin/activate
+
+            echo "===== PYTHON ====="
+            python --version
+            which python
+
+            echo "===== PYTEST ====="
+            which pytest
+            pytest --version
+
+            echo "===== SYNTAX CHECK ====="
 
             python -m py_compile \
                 main.py \
@@ -44,25 +95,18 @@ pipeline {
                 ocr_engine.py \
                 audit_ledger.py
 
-            echo "Running pytest..."
+            echo "Python syntax check passed."
+
+            echo "===== TESTCLIENT CHECK ====="
+
+            python -c "from fastapi.testclient import TestClient; print('TestClient OK')"
+
+            echo "===== RUN TESTS ====="
 
             if [ -f test_e2e.py ]; then
-                set +e
                 pytest -v test_e2e.py
-                TEST_EXIT_CODE=$?
-                set -e
-
-                if [ $TEST_EXIT_CODE -eq 5 ]; then
-                    echo "WARNING: No pytest tests were collected."
-                    echo "Continuing pipeline..."
-                elif [ $TEST_EXIT_CODE -ne 0 ]; then
-                    echo "Tests failed with exit code $TEST_EXIT_CODE"
-                    exit $TEST_EXIT_CODE
-                else
-                    echo "All tests passed."
-                fi
             else
-                echo "No test_e2e.py found. Skipping pytest."
+                echo "No test_e2e.py found. Skipping tests."
             fi
         '''
     }
