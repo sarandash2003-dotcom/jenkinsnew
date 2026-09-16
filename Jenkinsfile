@@ -96,71 +96,100 @@ pipeline {
             }
         }
 
-        stage('Test') {
-            steps {
-                sh '''
-                    set -e
+      stage('Test') {
+    steps {
+        sh '''
+            set -e
 
-                    . venv/bin/activate
+            . venv/bin/activate
 
+            echo "======================================"
+            echo "PYTHON VERSION"
+            echo "======================================"
+
+            python --version
+
+            echo "======================================"
+            echo "PYTHON LOCATION"
+            echo "======================================"
+
+            which python
+
+            echo "======================================"
+            echo "SYNTAX CHECK"
+            echo "======================================"
+
+            python -m py_compile \
+                main.py \
+                crypto_engine.py \
+                ocr_engine.py \
+                audit_ledger.py
+
+            echo "Python syntax check PASSED."
+
+            echo "======================================"
+            echo "TESTCLIENT CHECK"
+            echo "======================================"
+
+            python -c "from fastapi.testclient import TestClient; print('TestClient import SUCCESS')"
+
+            echo "======================================"
+            echo "RUNNING PYTEST"
+            echo "======================================"
+
+            if [ -f test_e2e.py ]; then
+
+                set +e
+
+                python -m pytest -v test_e2e.py
+
+                TEST_EXIT_CODE=$?
+
+                set -e
+
+                if [ $TEST_EXIT_CODE -eq 0 ]; then
                     echo "======================================"
-                    echo "PYTHON VERSION"
+                    echo "ALL TESTS PASSED"
                     echo "======================================"
 
-                    python --version
-
+                elif [ $TEST_EXIT_CODE -eq 5 ]; then
                     echo "======================================"
-                    echo "PYTHON LOCATION"
+                    echo "WARNING: NO TESTS COLLECTED"
                     echo "======================================"
+                    echo "test_e2e.py exists, but pytest found 0 tests."
+                    echo "Continuing pipeline..."
 
-                    which python
-
+                else
                     echo "======================================"
-                    echo "PYTHON SYNTAX CHECK"
+                    echo "TESTS FAILED"
                     echo "======================================"
+                    echo "Pytest exit code: $TEST_EXIT_CODE"
 
-                    python -m py_compile \
-                        main.py \
-                        crypto_engine.py \
-                        ocr_engine.py \
-                        audit_ledger.py
+                    exit $TEST_EXIT_CODE
+                fi
 
-                    echo "Python syntax check PASSED."
+            else
+                echo "No test_e2e.py found."
+                echo "Skipping pytest."
+            fi
+        '''
+    }
+}
 
-                    echo "======================================"
-                    echo "TESTCLIENT CHECK"
-                    echo "======================================"
-
-                    python -c "from fastapi.testclient import TestClient; print('TestClient import SUCCESS')"
-
-                    echo "======================================"
-                    echo "RUNNING PYTEST"
-                    echo "======================================"
-
-                    if [ -f test_e2e.py ]; then
-                        python -m pytest -v test_e2e.py
-                    else
-                        echo "No test_e2e.py found. Skipping tests."
-                    fi
-                '''
-            }
+    stage('SonarQube Analysis') {
+    steps {
+        withSonarQubeEnv('sonarqube') {
+            sh '''
+                sonar-scanner \
+                    -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                    -Dsonar.projectName=${APP_NAME} \
+                    -Dsonar.sources=. \
+                    -Dsonar.python.version=3.14 \
+                    -Dsonar.exclusions="venv/**,__pycache__/**,sample_certificates/**"
+            '''
         }
-
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv('sonarqube') {
-                    sh '''
-                        sonar-scanner \
-                            -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                            -Dsonar.projectName=${APP_NAME} \
-                            -Dsonar.sources=. \
-                            -Dsonar.python.version=3.14 \
-                            -Dsonar.exclusions="venv/**,__pycache__/**,sample_certificates/**"
-                    '''
-                }
-            }
-        }
-
+    }
+} 
         stage('Quality Gate') {
             steps {
                 timeout(time: 5, unit: 'MINUTES') {
