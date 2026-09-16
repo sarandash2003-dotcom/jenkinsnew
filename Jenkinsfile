@@ -31,25 +31,25 @@ pipeline {
             }
         }
 
-        stage('Test') {
-            steps {
-                sh '''
-                    . venv/bin/activate
+      stage('Test') {
+    steps {
+        sh '''
+            . venv/bin/activate
 
-                    python -m py_compile \
-                        main.py \
-                        crypto_engine.py \
-                        ocr_engine.py \
-                        audit_ledger.py
+            python -m py_compile \
+                main.py \
+                crypto_engine.py \
+                ocr_engine.py \
+                audit_ledger.py
 
-                    if [ -f test_e2e.py ]; then
-                        pytest -v test_e2e.py
-                    else
-                        echo "No test file found. Skipping tests."
-                    fi
-                '''
-            }
-        }
+            if [ -f test_e2e.py ]; then
+                pytest -v test_e2e.py
+            else
+                echo "No test file found. Skipping tests."
+            fi
+        '''
+    }
+}
 
         stage('SonarQube Analysis') {
             steps {
