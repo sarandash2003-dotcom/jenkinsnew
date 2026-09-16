@@ -27,29 +27,34 @@ pipeline {
             }
         }
 
-        stage('Install Dependencies') {
-            steps {
-                sh '''
-                    echo "Creating Python virtual environment..."
+      stage('Install Dependencies') {
+    steps {
+        sh '''
+            set -e
 
-                    python3 -m venv venv
+            rm -rf venv
 
-                    . venv/bin/activate
+            python3.12 -m venv venv
 
-                    echo "Upgrading pip..."
-                    python -m pip install --upgrade pip
+            . venv/bin/activate
 
-                    echo "Installing project dependencies..."
-                    pip install -r requirements.txt
+            python --version
 
-                    echo "Installing testing dependencies..."
-                    pip install pytest httpx2
+            python -m pip install --upgrade pip
 
-                    echo "Installed packages:"
-                    pip list
-                '''
-            }
-        }
+            pip install -r requirements.txt
+
+            pip install --upgrade pytest httpx2
+
+            echo "Checking installed packages..."
+
+            pip show fastapi
+            pip show starlette
+            pip show httpx2
+            pip show pytest
+        '''
+    }
+}
 
         stage('Test') {
             steps {
