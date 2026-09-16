@@ -3,19 +3,11 @@ pipeline {
 
     environment {
         APP_NAME = "seclock"
-
-        // Change this to your actual AWS region
-        AWS_REGION = "ap-south-1"
-
+        AWS_REGION = "ap-northeast-1"
         ECR_REPOSITORY = "seclock"
-
-        // Replace with your 12-digit AWS account ID
-        AWS_ACCOUNT_ID = "123456789012"
-
+        AWS_ACCOUNT_ID = "699588736418"
         ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-
         IMAGE_NAME = "${ECR_REGISTRY}/${ECR_REPOSITORY}"
-
         SONAR_PROJECT_KEY = "seclock"
     }
 
@@ -27,101 +19,59 @@ pipeline {
             }
         }
 
-      stage('Install Dependencies') {
-    steps {
-        sh '''
-            set -e
-
-            rm -rf venv
-
-            python3.12 -m venv venv
-
-            . venv/bin/activate
-
-            python --version
-
-            python -m pip install --upgrade pip
-
-            pip install -r requirements.txt
-
-            pip install --upgrade pytest httpx2
-
-            echo "Checking installed packages..."
-
-            pip show fastapi
-            pip show starlette
-            pip show httpx2
-            pip show pytest
-        '''
-    }
-}
-
-        stage('Test') {
+        stage('Install Dependencies') {
             steps {
                 sh '''
+                    python3 -m venv venv
                     . venv/bin/activate
-
-                    echo "======================================"
-                    echo "Running Python syntax checks"
-                    echo "======================================"
-
-                    python -m py_compile \
-                        main.py \
-                        crypto_engine.py \
-                        ocr_engine.py \
-                        audit_ledger.py
-
-                    echo "Python syntax check passed."
-
-                    echo "======================================"
-                    echo "Running pytest"
-                    echo "======================================"
-
-                    if [ -f test_e2e.py ]; then
-
-                        set +e
-
-                        pytest -v test_e2e.py
-
-                        TEST_EXIT_CODE=$?
-
-                        set -e
-
-                        if [ $TEST_EXIT_CODE -eq 5 ]; then
-
-                            echo "WARNING: No pytest tests were collected."
-                            echo "Continuing pipeline..."
-
-                        elif [ $TEST_EXIT_CODE -ne 0 ]; then
-
-                            echo "Tests failed with exit code $TEST_EXIT_CODE"
-
-                            exit $TEST_EXIT_CODE
-
-                        else
-
-                            echo "All tests passed."
-
-                        fi
-
-                    else
-
-                        echo "No test_e2e.py found."
-                        echo "Skipping pytest."
-
-                    fi
+                    pip install --upgrade pip
+                    pip install -r requirements.txt
+                    pip install pytest httpx2
                 '''
             }
         }
+
+        stage('Test') {
+    steps {
+        sh '''
+            . venv/bin/activate
+
+            echo "Running Python syntax checks..."
+
+            python -m py_compile \
+                main.py \
+                crypto_engine.py \
+                ocr_engine.py \
+                audit_ledger.py
+
+            echo "Running pytest..."
+
+            if [ -f test_e2e.py ]; then
+                set +e
+                pytest -v test_e2e.py
+                TEST_EXIT_CODE=$?
+                set -e
+
+                if [ $TEST_EXIT_CODE -eq 5 ]; then
+                    echo "WARNING: No pytest tests were collected."
+                    echo "Continuing pipeline..."
+                elif [ $TEST_EXIT_CODE -ne 0 ]; then
+                    echo "Tests failed with exit code $TEST_EXIT_CODE"
+                    exit $TEST_EXIT_CODE
+                else
+                    echo "All tests passed."
+                fi
+            else
+                echo "No test_e2e.py found. Skipping pytest."
+            fi
+        '''
+    }
+}
 
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('sonarqube') {
                     sh '''
-                        echo "======================================"
-                        echo "Running SonarQube analysis"
-                        echo "======================================"
-
                         sonar-scanner \
                             -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
                             -Dsonar.projectName=${APP_NAME} \
@@ -147,16 +97,10 @@ pipeline {
                     env.IMAGE_TAG = "${BUILD_NUMBER}"
 
                     sh """
-                        echo "======================================"
-                        echo "Building Docker image"
-                        echo "======================================"
-
                         docker build \
                             -t ${IMAGE_NAME}:${IMAGE_TAG} \
                             -t ${IMAGE_NAME}:latest \
                             .
-
-                        echo "Docker build completed."
                     """
                 }
             }
@@ -169,17 +113,11 @@ pipeline {
                      credentialsId: 'aws-credentials']
                 ]) {
                     sh '''
-                        echo "======================================"
-                        echo "Logging in to Amazon ECR"
-                        echo "======================================"
-
                         aws ecr get-login-password \
                             --region ${AWS_REGION} \
                         | docker login \
                             --username AWS \
                             --password-stdin ${ECR_REGISTRY}
-
-                        echo "ECR login successful."
                     '''
                 }
             }
@@ -188,35 +126,21 @@ pipeline {
         stage('Push to ECR') {
             steps {
                 sh '''
-                    echo "======================================"
-                    echo "Pushing Docker images to ECR"
-                    echo "======================================"
-
                     docker push ${IMAGE_NAME}:${IMAGE_TAG}
-
                     docker push ${IMAGE_NAME}:latest
-
-                    echo "Images pushed successfully."
                 '''
             }
         }
     }
 
     post {
-
         success {
-            echo "======================================"
             echo "Pipeline completed successfully!"
-            echo "======================================"
-            echo "Docker image:"
-            echo "${IMAGE_NAME}:${IMAGE_TAG}"
+            echo "Docker image pushed to: ${IMAGE_NAME}:${IMAGE_TAG}"
         }
 
         failure {
-            echo "======================================"
-            echo "Pipeline failed!"
-            echo "======================================"
-            echo "Check the Jenkins console output."
+            echo "Pipeline failed. Check the Jenkins console output."
         }
 
         always {
@@ -226,5 +150,3 @@ pipeline {
         }
     }
 }
-
-   
