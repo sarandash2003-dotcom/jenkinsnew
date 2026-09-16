@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         APP_NAME = "seclock"
-        AWS_REGION = "ap-south-1"
+        AWS_REGION = "ap-northsouth-1"
         ECR_REPOSITORY = "seclock"
         AWS_ACCOUNT_ID = "YOUR_AWS_ACCOUNT_ID"
         ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
@@ -53,7 +53,7 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('SonarQube') {
+                withSonarQubeEnv('sonarqube') {
                     sh '''
                         sonar-scanner \
                             -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
