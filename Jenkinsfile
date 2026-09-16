@@ -3,11 +3,14 @@ pipeline {
 
     environment {
         APP_NAME = "seclock"
+
         AWS_REGION = "ap-south-1"
-        ECR_REPOSITORY = "seclock"
         AWS_ACCOUNT_ID = "994878981749"
+
+        ECR_REPOSITORY = "seclock"
         ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_NAME = "${ECR_REGISTRY}/${ECR_REPOSITORY}"
+
         SONAR_PROJECT_KEY = "seclock"
     }
 
@@ -19,85 +22,130 @@ pipeline {
             }
         }
 
+        stage('Install Dependencies') {
+            steps {
+                sh '''
+                    set -e
 
-stage('Install Dependencies') {
-    steps {
-        sh '''
-            set -e
+                    echo "======================================"
+                    echo "REMOVE OLD VIRTUAL ENVIRONMENT"
+                    echo "======================================"
 
-            echo "===== REMOVE OLD VIRTUAL ENVIRONMENT ====="
-            rm -rf venv
+                    rm -rf venv
 
-            echo "===== CREATE VIRTUAL ENVIRONMENT ====="
-            python3 -m venv venv
+                    echo "======================================"
+                    echo "CREATE VIRTUAL ENVIRONMENT"
+                    echo "======================================"
 
-            echo "===== ACTIVATE VIRTUAL ENVIRONMENT ====="
-            . venv/bin/activate
+                    python3 -m venv venv
 
-            echo "===== PYTHON VERSION ====="
-            python --version
-            which python
+                    echo "======================================"
+                    echo "ACTIVATE VIRTUAL ENVIRONMENT"
+                    echo "======================================"
 
-            echo "===== UPGRADE PIP ====="
-            python -m pip install --upgrade pip
+                    . venv/bin/activate
 
-            echo "===== INSTALL REQUIREMENTS ====="
-            python -m pip install -r requirements.txt
+                    echo "Python version:"
+                    python --version
 
-            echo "===== INSTALL TEST DEPENDENCIES ====="
-            python -m pip install --upgrade pytest httpx2
+                    echo "Python location:"
+                    which python
 
-            echo "===== VERIFY FASTAPI ====="
-            python -m pip show fastapi
+                    echo "======================================"
+                    echo "UPGRADE PIP"
+                    echo "======================================"
 
-            echo "===== VERIFY STARLETTE ====="
-            python -m pip show starlette
+                    python -m pip install --upgrade pip
 
-            echo "===== VERIFY HTTPX2 ====="
-            python -m pip show httpx2
+                    echo "======================================"
+                    echo "INSTALL REQUIREMENTS"
+                    echo "======================================"
 
-            echo "===== VERIFY TESTCLIENT ====="
-            python -c "from fastapi.testclient import TestClient; print('TestClient import SUCCESS')"
-        '''
-    }
-}
-       stage('Test') {
-    steps {
-        sh '''
-            set -e
+                    python -m pip install -r requirements.txt
 
-            . venv/bin/activate
+                    echo "======================================"
+                    echo "INSTALL TEST DEPENDENCIES"
+                    echo "======================================"
 
-            echo "===== PYTHON VERSION ====="
-            python --version
+                    python -m pip install --upgrade pytest httpx2
 
-            echo "===== PYTHON LOCATION ====="
-            which python
+                    echo "======================================"
+                    echo "VERIFY FASTAPI"
+                    echo "======================================"
 
-            echo "===== SYNTAX CHECK ====="
+                    python -m pip show fastapi
 
-            python -m py_compile \
-                main.py \
-                crypto_engine.py \
-                ocr_engine.py \
-                audit_ledger.py
+                    echo "======================================"
+                    echo "VERIFY STARLETTE"
+                    echo "======================================"
 
-            echo "Python syntax check passed."
+                    python -m pip show starlette
 
-            echo "===== TESTCLIENT CHECK ====="
+                    echo "======================================"
+                    echo "VERIFY HTTPX2"
+                    echo "======================================"
 
-            python -c "from fastapi.testclient import TestClient; print('TestClient import SUCCESS')"
+                    python -m pip show httpx2
 
-            echo "===== RUNNING PYTEST ====="
+                    echo "======================================"
+                    echo "VERIFY TESTCLIENT"
+                    echo "======================================"
 
-            if [ -f test_e2e.py ]; then
-                python -m pytest -v test_e2e.py
-            else
-                echo "No test_e2e.py found. Skipping tests."
-            fi
-        '''
-    }
-}
+                    python -c "from fastapi.testclient import TestClient; print('TestClient import SUCCESS')"
+                '''
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh '''
+                    set -e
+
+                    . venv/bin/activate
+
+                    echo "======================================"
+                    echo "PYTHON VERSION"
+                    echo "======================================"
+
+                    python --version
+
+                    echo "======================================"
+                    echo "PYTHON LOCATION"
+                    echo "======================================"
+
+                    which python
+
+                    echo "======================================"
+                    echo "PYTHON SYNTAX CHECK"
+                    echo "======================================"
+
+                    python -m py_compile \
+                        main.py \
+                        crypto_engine.py \
+                        ocr_engine.py \
+                        audit_ledger.py
+
+                    echo "Python syntax check PASSED."
+
+                    echo "======================================"
+                    echo "TESTCLIENT CHECK"
+                    echo "======================================"
+
+                    python -c "from fastapi.testclient import TestClient; print('TestClient import SUCCESS')"
+
+                    echo "======================================"
+                    echo "RUNNING PYTEST"
+                    echo "======================================"
+
+                    if [ -f test_e2e.py ]; then
+                        python -m pytest -v test_e2e.py
+                    else
+                        echo "No test_e2e.py found. Skipping tests."
+                    fi
+                '''
+            }
+        }
+
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('sonarqube') {
@@ -106,8 +154,8 @@ stage('Install Dependencies') {
                             -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
                             -Dsonar.projectName=${APP_NAME} \
                             -Dsonar.sources=. \
-                            -Dsonar.python.version=3.12 \
-                            -Dsonar.exclusions="venv/*,_pycache_/,sample_certificates/*"
+                            -Dsonar.python.version=3.14 \
+                            -Dsonar.exclusions="venv/**,__pycache__/**,sample_certificates/**"
                     '''
                 }
             }
@@ -164,13 +212,22 @@ stage('Install Dependencies') {
     }
 
     post {
+
         success {
-            echo "Pipeline completed successfully!"
-            echo "Docker image pushed to: ${IMAGE_NAME}:${IMAGE_TAG}"
+            echo "======================================"
+            echo "PIPELINE COMPLETED SUCCESSFULLY"
+            echo "======================================"
+
+            echo "Docker image pushed to:"
+            echo "${IMAGE_NAME}:${IMAGE_TAG}"
         }
 
         failure {
-            echo "Pipeline failed. Check the Jenkins console output."
+            echo "======================================"
+            echo "PIPELINE FAILED"
+            echo "======================================"
+
+            echo "Check the Jenkins console output."
         }
 
         always {
